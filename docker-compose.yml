@@ -2,8 +2,9 @@
 # Subir:   docker compose up -d --build
 # Derrubar: docker compose down        (mantém os dados; use "down -v" para apagar)
 #
-# Variáveis vêm do arquivo .env (copie de .env.example). Todas têm default
-# para o teste local funcionar sem .env.
+# Variáveis vêm do arquivo .env (copie de .env.example). JWT_SECRET,
+# MYSQL_ROOT_PASSWORD e ADMIN_PASSWORD são obrigatórias: sem elas o compose
+# não sobe.
 #
 # Pré-requisito: este repositório precisa estar lado a lado com os outros 3,
 # clonados na branch main/master mais recente. Veja o README.md.
@@ -13,7 +14,7 @@ services:
     image: mysql:8.4
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?defina MYSQL_ROOT_PASSWORD no .env}
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
@@ -76,15 +77,16 @@ services:
       kafka-init:
         condition: service_completed_successfully
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/morkstore?createDatabaseIfNotExist=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      SPRING_JPA_SHOW_SQL: "false"
-      APP_CORS_ALLOWED_ORIGINS: ${FRONTEND_ORIGIN:-http://localhost:4200}
-      APP_SEED_ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      APP_SEED_ADMIN_PASSWORD: ${ADMIN_PASSWORD:-conecta@2024}
-      APP_SEED_ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@admin.com}
+      DB_URL: jdbc:mysql://mysql:3306/morkstore?createDatabaseIfNotExist=true
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?defina MYSQL_ROOT_PASSWORD no .env}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JPA_SHOW_SQL: "false"
+      CORS_ALLOWED_ORIGINS: ${FRONTEND_ORIGIN:-http://localhost:4200}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?defina ADMIN_PASSWORD no .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@admin.com}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
     ports:
       - "8080:8080"
@@ -99,15 +101,13 @@ services:
       kafka-init:
         condition: service_completed_successfully
     environment:
-      QUARKUS_DATASOURCE_JDBC_URL: jdbc:mysql://mysql:3306/morkstore_analytics?createDatabaseIfNotExist=true
-      QUARKUS_DATASOURCE_USERNAME: root
-      QUARKUS_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      QUARKUS_HIBERNATE_ORM_LOG_SQL: "false"
-      QUARKUS_HTTP_CORS_ORIGINS: ${FRONTEND_ORIGIN:-http://localhost:4200}
-      # Um por canal de entrada (nomes com "-" viram "_" nas variáveis).
-      MP_MESSAGING_INCOMING_USER_ANALYTICS_BOOTSTRAP_SERVERS: kafka:9092
-      MP_MESSAGING_INCOMING_PRODUCT_ANALYTICS_BOOTSTRAP_SERVERS: kafka:9092
-      MP_MESSAGING_INCOMING_ORDER_ANALYTICS_BOOTSTRAP_SERVERS: kafka:9092
+      DB_URL: jdbc:mysql://mysql:3306/morkstore_analytics?createDatabaseIfNotExist=true
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?defina MYSQL_ROOT_PASSWORD no .env}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      LOG_SQL: "false"
+      CORS_ALLOWED_ORIGINS: ${FRONTEND_ORIGIN:-http://localhost:4200}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
     ports:
       - "8091:8091"
