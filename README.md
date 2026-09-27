@@ -37,11 +37,9 @@ no `.env`). MySQL e Kafka não são expostos ao host.
 
 ## Antes de publicar numa VM
 
-- [ ] Trocar `MYSQL_ROOT_PASSWORD`, `ADMIN_PASSWORD` no `.env` (nunca commitar
-      esse arquivo).
-- [ ] Trocar o segredo do JWT, hoje fixo no código da API e do
-      analytics-service (repositórios públicos) — tratar o valor atual como
-      comprometido.
+- [ ] Definir `MYSQL_ROOT_PASSWORD`, `ADMIN_PASSWORD` e `JWT_SECRET` no
+      `.env` (nunca commitar esse arquivo). O `JWT_SECRET` precisa ter pelo
+      menos 32 caracteres: `openssl rand -base64 48`.
 - [ ] Ajustar `FRONTEND_ORIGIN`, `PUBLIC_API_URL`, `PUBLIC_ANALYTICS_URL` no
       `.env` para o domínio/IP público real.
 - [ ] Abrir no firewall só as portas do frontend, da API e do analytics.
