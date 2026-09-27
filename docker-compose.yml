@@ -68,7 +68,7 @@ services:
         done
 
   api:
-    build: ../loja-brinquedos-api
+    build: ../morkstore-api
     restart: unless-stopped
     depends_on:
       mysql:
@@ -91,7 +91,7 @@ services:
     mem_limit: 1g
 
   analytics:
-    build: ../kidsgrace-analytics-service
+    build: ../morkstore-analytics-service
     restart: unless-stopped
     depends_on:
       mysql:
@@ -115,7 +115,7 @@ services:
 
   frontend:
     build:
-      context: ../kidsgrace-frontend
+      context: ../morkstore-frontend
       args:
         # URLs que o NAVEGADOR do visitante usa (embutidas no bundle).
         API_URL: ${PUBLIC_API_URL:-http://localhost:8080}

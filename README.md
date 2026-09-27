@@ -12,16 +12,16 @@ irmãos na mesma pasta:
 ```
 algum-diretorio/
 ├── morkstore-deploy/          (este repo)
-├── loja-brinquedos-api/
-├── kidsgrace-analytics-service/
-└── kidsgrace-frontend/
+├── morkstore-api/
+├── morkstore-analytics-service/
+└── morkstore-frontend/
 ```
 
 ```bash
 git clone https://github.com/AlissonMM/morkstore-deploy.git
-git clone https://github.com/AlissonMM/loja-brinquedos-api.git
-git clone https://github.com/AlissonMM/kidsgrace-analytics-service.git
-git clone https://github.com/AlissonMM/kidsgrace-frontend.git
+git clone https://github.com/AlissonMM/morkstore-api.git
+git clone https://github.com/AlissonMM/morkstore-analytics-service.git
+git clone https://github.com/AlissonMM/morkstore-frontend.git
 ```
 
 ## Subir a stack
