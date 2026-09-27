@@ -1,0 +1,132 @@
+# Mork Store — stack completa (MySQL + Kafka + API + Analytics + Frontend)
+# Subir:   docker compose up -d --build
+# Derrubar: docker compose down        (mantém os dados; use "down -v" para apagar)
+#
+# Variáveis vêm do arquivo .env (copie de .env.example). Todas têm default
+# para o teste local funcionar sem .env.
+#
+# Pré-requisito: este repositório precisa estar lado a lado com os outros 3,
+# clonados na branch main/master mais recente. Veja o README.md.
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    mem_limit: 1g
+
+  kafka:
+    image: apache/kafka:4.3.1
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      # Endereço que os OUTROS containers usam para achar o broker.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Broker único: sem réplicas.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    mem_limit: 1g
+
+  # Container de uso único: cria os 3 tópicos e termina.
+  kafka-init:
+    image: apache/kafka:4.3.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for t in users.events products.events orders.events; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic $$t --partitions 1 --replication-factor 1
+        done
+
+  api:
+    build: ../loja-brinquedos-api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/morkstore?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_JPA_SHOW_SQL: "false"
+      APP_CORS_ALLOWED_ORIGINS: ${FRONTEND_ORIGIN:-http://localhost:4200}
+      APP_SEED_ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      APP_SEED_ADMIN_PASSWORD: ${ADMIN_PASSWORD:-conecta@2024}
+      APP_SEED_ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@admin.com}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
+    ports:
+      - "8080:8080"
+    mem_limit: 1g
+
+  analytics:
+    build: ../kidsgrace-analytics-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:mysql://mysql:3306/morkstore_analytics?createDatabaseIfNotExist=true
+      QUARKUS_DATASOURCE_USERNAME: root
+      QUARKUS_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      QUARKUS_HIBERNATE_ORM_LOG_SQL: "false"
+      QUARKUS_HTTP_CORS_ORIGINS: ${FRONTEND_ORIGIN:-http://localhost:4200}
+      # Um por canal de entrada (nomes com "-" viram "_" nas variáveis).
+      MP_MESSAGING_INCOMING_USER_ANALYTICS_BOOTSTRAP_SERVERS: kafka:9092
+      MP_MESSAGING_INCOMING_PRODUCT_ANALYTICS_BOOTSTRAP_SERVERS: kafka:9092
+      MP_MESSAGING_INCOMING_ORDER_ANALYTICS_BOOTSTRAP_SERVERS: kafka:9092
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
+    ports:
+      - "8091:8091"
+    mem_limit: 768m
+
+  frontend:
+    build:
+      context: ../kidsgrace-frontend
+      args:
+        # URLs que o NAVEGADOR do visitante usa (embutidas no bundle).
+        API_URL: ${PUBLIC_API_URL:-http://localhost:8080}
+        ANALYTICS_URL: ${PUBLIC_ANALYTICS_URL:-http://localhost:8091}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${FRONTEND_PORT:-4200}:4000"
+    mem_limit: 512m
+
+volumes:
+  mysql-data:
+  kafka-data:
